@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <!-- KUNCI LAYAR AGAR TIDAK BISA DI ZOOM -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Curva Sud Skaliska Database</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase SDK (Compatibility Version) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+
+    <!-- PDF Export Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* Mencegah seleksi teks berlebih dan touch delay */
+        body {
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+            background-color: #f1f5f9;
+        }
+        input, textarea, select {
+            -webkit-user-select: text;
+            user-select: text;
+        }
+        .checkmark-circle {
+            width: 80px; height: 80px;
+            border-radius: 50%;
+            border: 4px solid #10b981;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 15px;
+            animation: scaleIn 0.3s ease-out forwards;
+        }
+        .checkmark-icon {
+            font-size: 40px; color: #10b981;
+            animation: drawCheck 0.2s 0.2s ease-out forwards;
+            opacity: 0; transform: scale(0.5);
+        }
+        @keyframes scaleIn { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+        @keyframes drawCheck { 0% { opacity: 0; transform: scale(0.5); } 100% { opacity: 1; transform: scale(1); } }
+        
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9px;
+        }
+        th {
+            background-color: #f8fafc;
+            text-align: left;
+            padding: 10px 8px;
+            border-bottom: 2px solid #e2e8f0;
+            white-space: nowrap;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        td {
+            padding: 8px;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: middle;
+            color: #1e293b;
+            white-space: nowrap;
+        }
+        .img-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid #e2e8f0;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .img-circle:hover {
+            transform: scale(1.1);
+            border-color: #10b981;
+        }
+        .luxury-title {
+            font-family: 'Playfair Display', serif;
+            letter-spacing: -1px;
+        }
+
+        /* LOGIN STYLES */
+        .login-bg {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        .login-input {
+            transition: all 0.3s;
+            border: 1px solid #e2e8f0;
+        }
+        .login-input:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+            outline: none;
+        }
+        
+        /* NOTIFICATION DOT */
+        #notif-dot { display: none; }
+    </style>
+</head>
+<body class="font-sans antialiased">
+
+    <!-- SCREEN LOGIN -->
+    <div id="login-screen" class="fixed inset-0 z-[1000] login-bg flex items-center justify-center p-4">
+        <div class="w-full max-md">
+            <div class="text-center mb-8">
+                <h1 class="luxury-title text-4xl font-black text-white mb-2">CURVA SUD <span class="text-blue-500">SKALISKA</span></h1>
+                <p class="text-slate-400 text-xs font-bold uppercase tracking-widest">Database Management System</p>
+            </div>
+
+            <!-- Login Card -->
+            <div id="card-auth" class="glass-card rounded-3xl p-8">
+                <div id="login-form-container">
+                    <div class="flex justify-center mb-6">
+                        <div class="bg-slate-100 p-1 rounded-xl flex">
+                            <button onclick="switchLoginTab('admin')" id="tab-admin" class="px-6 py-2 rounded-lg text-xs font-bold transition-all bg-blue-600 text-white shadow-sm">ADMIN</button>
+                            <button onclick="switchLoginTab('anggota')" id="tab-anggota" class="px-6 py-2 rounded-lg text-xs font-bold transition-all text-slate-500">ANGGOTA</button>
+                        </div>
+                    </div>
+
+                    <form onsubmit="handleLogin(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase ml-1 mb-1">Username / Nama</label>
+                            <div class="relative">
+                                <i class="fa-solid fa-user absolute left-4 top-3.5 text-slate-400 text-xs"></i>
+                                <input type="text" id="login-user" required class="login-input w-full pl-10 pr-4 py-3 rounded-xl text-sm bg-slate-50" placeholder="Masukkan username">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase ml-1 mb-1">Password / WA</label>
+                            <div class="relative">
+                                <i class="fa-solid fa-lock absolute left-4 top-3.5 text-slate-400 text-xs"></i>
+                                <input type="password" id="login-pass" required class="login-input w-full pl-10 pr-4 py-3 rounded-xl text-sm bg-slate-50" placeholder="••••••••">
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-500/30 transition-all text-xs tracking-widest uppercase">Masuk ke Sistem</button>
+                    </form>
+                    
+                    <div class="mt-6 pt-6 border-t border-slate-100 text-center">
+                        <button onclick="toggleRegister(true)" class="text-[10px] font-bold text-blue-600 uppercase tracking-wider hover:underline">Belum Terdaftar? Register Anggota</button>
+                    </div>
+                </div>
+
+                <!-- Register Form (Hidden by default) -->
+                <div id="register-form-container" class="hidden">
+                    <div class="flex items-center mb-6">
+                        <button onclick="toggleRegister(false)" class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 mr-3">
+                            <i class="fa-solid fa-arrow-left text-xs"></i>
+                        </button>
+                        <h2 class="font-bold text-slate-800 text-sm uppercase">Registrasi Anggota</h2>
+                    </div>
+                    <form onsubmit="handleRegister(event)" class="space-y-3">
+                        <div id="wadah-register-fields" class="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+                            <!-- Fields rendered dynamically via JS (same as pendaftaran) -->
+                        </div>
+                        <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl text-xs tracking-widest uppercase shadow-lg shadow-emerald-500/20 mt-4">Kirim Pendaftaran</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTAINER UTAMA (HIDDEN UNTIL LOGIN) -->
+    <div id="app-content" class="hidden max-w-md mx-auto bg-white min-h-screen shadow-xl flex flex-col justify-between relative overflow-x-hidden transition-all duration-500">
+        
+        <!-- HEADER HALAMAN -->
+        <header class="bg-emerald-600 text-white p-4 sticky top-0 z-50 shadow-md">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleSidebar(true)" class="w-10 h-10 rounded-xl bg-emerald-500/50 flex items-center justify-center hover:bg-emerald-500 transition-colors focus:outline-none">
+                        <i class="fa-solid fa-bars text-lg"></i>
+                    </button>
+                    <div>
+                        <h1 class="text-sm font-bold tracking-wide uppercase">Curva Sud Skaliska</h1>
+                        <p class="text-[10px] text-emerald-100" id="label-role-user">Status: Super Admin</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <!-- ICON LAPTOP UNTUK TOGGLE VIEW -->
+                    <button onclick="toggleDesktopMode()" title="Toggle Desktop View" class="w-10 h-10 rounded-full bg-blue-500/50 flex items-center justify-center hover:bg-blue-500 transition-colors">
+                        <i class="fa-solid fa-laptop"></i>
+                    </button>
+                    <button id="btn-lonceng" onclick="tampilkanNotifikasi()" class="w-10 h-10 rounded-full bg-amber-500/50 flex items-center justify-center hover:bg-amber-500 transition-colors relative">
+                        <i class="fa-solid fa-bell"></i>
+                        <span id="notif-dot" class="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border border-white"></span>
+                    </button>
+                    <button onclick="logoutSistem()" class="w-10 h-10 rounded-full bg-rose-500/50 flex items-center justify-center hover:bg-rose-500 transition-colors">
+                        <i class="fa-solid fa-power-off"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- SIDEBAR DRAWER MENU -->
+        <div id="sidebar-menu" class="absolute inset-y-0 left-0 w-72 bg-slate-900 text-slate-200 z-[100] shadow-2xl transform -translate-x-full transition-transform duration-300 ease-in-out flex flex-col justify-between">
+            <div class="overflow-y-auto">
+                <div class="p-4 bg-slate-950 border-b border-slate-800 flex justify-between items-center">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-folder-tree text-emerald-500 text-lg"></i>
+                        <span class="font-bold text-sm tracking-wide text-white uppercase">Curva Sud Skaliska</span>
+                    </div>
+                    <button onclick="toggleSidebar(false)" class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+                        <i class="fa-solid fa-xmark text-sm"></i>
+                    </button>
+                </div>
+                <div class="p-3 space-y-1">
+                    <button id="menu-dashboard" onclick="pilihMenu('page-statistik')" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow-sm text-left transition-all">
+                        <i class="fa-solid fa-chart-simple w-4 text-center"></i> Dashboard & Statistik
+                    </button>
+                    <button id="menu-form" onclick="pilihMenu('page-form')" class="admin-only w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white text-left transition-all">
+                        <i class="fa-solid fa-circle-plus w-4 text-center"></i> Form Input Data Terpadu
+                    </button>
+                    
+                    <div class="admin-only pt-4 pb-2 px-4">
+                        <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Arsip Komponen Data</span>
+                    </div>
+
+                    <button id="menu-pendaftaran" onclick="bukaHalamanArsip('pendaftaran')" class="admin-only w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white text-left transition-all">
+                        <i class="fa-solid fa-user-plus w-4 text-center text-cyan-400"></i> Data Pendaftaran
+                    </button>
+                    <button id="menu-anggota" onclick="bukaHalamanArsip('anggota')" class="admin-only w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white text-left transition-all">
+                        <i class="fa-solid fa-users w-4 text-center text-emerald-400"></i> Anggota Massa Tetap
+                    </button>
+                    <button id="menu-koordinator" onclick="bukaHalamanArsip('koordinator')" class="admin-only w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white text-left transition-all">
+                        <i class="fa-solid fa-user-tie w-4 text-center text-blue-400"></i> Data Koordinator
+                    </button>
+                    <button id="menu-alumni-pembina" onclick="bukaHalamanArsip('alumni_pembina')" class="admin-only w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white text-left transition-all">
+                        <i class="fa-solid fa-user-graduate w-4 text-center text-rose-400"></i> Alumni / Pembina
+                    </button>
+                    <button id="menu-administrasi" onclick="bukaHalamanArsip('administrasi')" class="admin-only w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white text-left transition-all">
+                        <i class="fa-solid fa-folder-open w-4 text-center text-amber-500"></i> Administrasi / Surat
+                    </button>
+                    <button id="menu-keuangan" onclick="bukaHalamanArsip('keuangan')" class="admin-only w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white text-left transition-all">
+                        <i class="fa-solid fa-wallet w-4 text-center text-emerald-400"></i> Data Laporan Keuangan
+                    </button>
+                    <button id="menu-kas-tim" onclick="bukaHalamanArsip('kas_tim')" class="admin-only w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white text-left transition-all">
+                        <i class="fa-solid fa-money-bill-trend-up w-4 text-center text-lime-400"></i> Data Pembayaran Member
+                    </button>
+                    <button id="menu-absensi" onclick="bukaHalamanArsip('absensi')" class="admin-only w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white text-left transition-all">
+                        <i class="fa-solid fa-clipboard-user w-4 text-center text-indigo-400"></i> Data Absensi
+                    </button>
+                    <button id="menu-raport" onclick="bukaHalamanArsip('raport')" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white text-left transition-all">
+                        <i class="fa-solid fa-address-card w-4 text-center text-orange-400"></i> Data Raport Anggota
+                    </button>
+                    <button id="menu-proker" onclick="bukaHalamanArsip('program_kerja')" class="admin-only w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white text-left transition-all">
+                        <i class="fa-solid fa-layer-group w-4 text-center text-amber-400"></i> Data Program Kerja
+                    </button>
+                    <button id="menu-agenda" onclick="bukaHalamanArsip('agenda')" class="admin-only w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white text-left transition-all">
+                        <i class="fa-solid fa-calendar-days w-4 text-center text-teal-400"></i> Data Agenda
+                    </button>
+                    <button id="menu-evaluasi" onclick="bukaHalamanArsip('evaluasi')" class="admin-only w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white text-left transition-all">
+                        <i class="fa-solid fa-triangle-exclamation w-4 text-center text-rose-400"></i> Data Evaluasi
+                    </button>
+                    
+                    <!-- MENU KHUSUS SUPER ADMIN -->
+                    <div id="super-admin-menu">
+                        <div class="pt-4 pb-2 px-4 border-t border-slate-800 mt-2">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Super Admin Controls</span>
+                        </div>
+                        <button onclick="bukaHalamanArsip('admin')" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800 hover:text-white text-left transition-all">
+                            <i class="fa-solid fa-user-gear w-4 text-center text-slate-400"></i> Data Admin Sistem
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="p-4 bg-slate-950 text-center text-[10px] text-slate-500 border-t border-slate-800">
+                Curva Sud Skaliska v3.6
+            </div>
+        </div>
+
+        <!-- OVERLAY SIDEBAR -->
+        <div id="sidebar-overlay" onclick="toggleSidebar(false)" class="absolute inset-0 bg-black/50 z-50 hidden transition-opacity duration-300"></div>
+
+        <!-- KONTEN UTAMA PAGES -->
+        <main class="flex-1 p-4 space-y-6">
+
+            <!-- PAGE 1: DASHBOARD UTAMA -->
+            <section id="page-statistik" class="space-y-4">
+                <div id="dashboard-content" class="space-y-4 pb-8">
+                    <div class="p-8 text-center text-slate-400 uppercase text-[10px] font-bold">Memuat data dashboard...</div>
+                </div>
+            </section>
+
+            <!-- PAGE 2: FORM INPUT DATA -->
+            <section id="page-form" class="hidden space-y-4">
+                <div class="flex items-center gap-2 mb-2">
+                    <button onclick="switchPage('page-statistik')" class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600"><i class="fa-solid fa-arrow-left text-xs"></i></button>
+                    <h3 id="form-title" class="text-sm font-bold text-slate-800 uppercase">Form Input Data Terpadu</h3>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 space-y-4">
+                    <select id="kategoriUtama" onchange="renderFormFields()" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2.5 font-semibold shadow-sm">
+                        <option value="pendaftaran">Pendaftaran</option>
+                        <option value="anggota">Anggota Massa Tetap</option>
+                        <option value="koordinator">Koordinator</option>
+                        <option value="alumni_pembina">Alumni / Pembina</option>
+                        <option value="administrasi">Administrasi / Surat</option>
+                        <option value="keuangan">Laporan Keuangan</option>
+                        <option value="kas_tim">Pembayaran Member</option>
+                        <option value="absensi">Absensi</option>
+                        <option value="program_kerja">Program Kerja</option>
+                        <option value="agenda">Agenda</option>
+                        <option value="evaluasi">Evaluasi</option>
+                        <option id="opt-admin" value="admin">Admin Sistem</option>
+                    </select>
+                    <form id="formDinamisSistem" onsubmit="prosesSimpanData(event)" class="space-y-3">
+                        <div id="wadah-input-dinamis" class="space-y-3"></div>
+                        <button type="submit" id="btnSimpanSistem" class="w-full bg-emerald-600 text-white font-bold text-xs py-3 rounded-xl shadow-md mt-4 uppercase">Simpan ke Sistem</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- PAGE 3: VIEW DATA ARSIP -->
+            <section id="page-arsip-view" class="hidden space-y-4">
+                <div class="flex flex-col gap-3">
+                    <div class="flex justify-between items-center">
+                        <h3 id="judul-halaman-arsip" class="text-sm font-bold text-slate-800 uppercase tracking-wider">Data Arsip</h3>
+                        <div class="flex gap-1.5" id="group-ekspor">
+                            <button onclick="eksporDataCSV()" class="bg-indigo-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg">CSV</button>
+                            <button onclick="eksporDataPDF()" class="bg-rose-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg">PDF</button>
+                        </div>
+                    </div>
+                    <div class="relative" id="group-cari">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                            <i class="fa-solid fa-magnifying-glass text-xs"></i>
+                        </span>
+                        <input type="text" id="inputCariArsip" oninput="jalankanFiturCari()" placeholder="Cari data..." class="w-full text-xs pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl shadow-sm">
+                    </div>
+                </div>
+
+                <div class="table-container bg-white rounded-xl border border-slate-200 shadow-sm">
+                    <div id="container-list-arsip"></div>
+                </div>
+
+                <!-- PAGINATION CONTROLS -->
+                <div id="pagination-controls" class="flex justify-between items-center px-1 py-2">
+                    <button onclick="ubahHalaman(-1)" id="btn-prev" class="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-[10px] font-bold disabled:opacity-30">SEBELUMNYA</button>
+                    <span id="info-halaman" class="text-[10px] font-bold text-slate-500 uppercase">Hal 1 dari 1</span>
+                    <button onclick="ubahHalaman(1)" id="btn-next" class="bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg text-[10px] font-bold disabled:opacity-30">BERIKUTNYA</button>
+                </div>
+
+                <!-- Bagian Akumulasi Khusus Raport / Kas -->
+                <div id="akumulasi-khusus-container" class="hidden mt-6 space-y-4">
+                    <h4 id="judul-akumulasi" class="text-xs font-bold text-emerald-700 uppercase px-1">Data Terakumulasi</h4>
+                    <div class="table-container bg-white rounded-xl border border-emerald-100 shadow-sm">
+                        <div id="container-akumulasi-data"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="p-3 bg-slate-50 text-center text-[10px] text-slate-400 border-t border-slate-100 uppercase font-bold tracking-widest">
+            Curva Sud Skaliska Database - v3.6
+        </footer>
+    </div>
+
+    <!-- MODAL SUCCESS -->
+    <div id="modal-success" class="fixed inset-0 bg-black/60 z-[200] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-xs text-center shadow-2xl">
+            <div class="checkmark-circle"><i class="fa-solid fa-check checkmark-icon"></i></div>
+            <h4 class="text-base font-bold text-slate-900">Berhasil!</h4>
+        </div>
+    </div>
+
+    <!-- MODAL FOTO -->
+    <div id="modal-foto" class="fixed inset-0 bg-black/80 z-[300] hidden flex items-center justify-center p-4" onclick="tutupPopUpFoto()">
+        <div class="relative max-w-sm w-full bg-white rounded-2xl overflow-hidden p-2 shadow-2xl" onclick="event.stopPropagation()">
+            <button onclick="tutupPopUpFoto()" class="absolute top-4 right-4 w-10 h-10 bg-black/20 text-white rounded-full flex items-center justify-center backdrop-blur-md">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+            <img id="preview-foto-besar" src="" class="w-full h-auto rounded-xl object-contain max-h-[70vh]">
+            <div class="p-3 text-center">
+                <p id="preview-nama-foto" class="text-sm font-bold text-slate-800"></p>
+                <p class="text-[10px] text-slate-500">Preview Berkas Digital</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL NOTIFIKASI -->
+    <div id="modal-notif" class="fixed inset-0 bg-black/60 z-[200] hidden flex items-center justify-center p-4" onclick="tutupNotifikasi()">
+        <div class="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
+            <div class="bg-amber-500 p-4 flex justify-between items-center text-white">
+                <h3 class="font-bold text-sm uppercase"><i class="fa-solid fa-bell mr-2"></i> Notifikasi Kegiatan</h3>
+                <button onclick="tutupNotifikasi()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="wadah-list-notif" class="p-4 space-y-3 max-h-[60vh] overflow-y-auto">
+                <!-- Isi notif -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIG & INIT ---
+        const firebaseConfig = {
+  apiKey: "AIzaSyDhrFHno_W1JweDj5DsZXEDW7GTlmILT3g",
+  authDomain: "curva-sud-skaliska.firebaseapp.com",
+  databaseURL: "https://curva-sud-skaliska-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "curva-sud-skaliska",
+  storageBucket: "curva-sud-skaliska.firebasestorage.app",
+  messagingSenderId: "1017916835241",
+  appId: "1:1017916835241:web:86bdb1e774cd81ccbdf0b8",
+  measurementId: "G-2GHRGSNM92"
+};
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        let storageOrganisasi = {
+            pendaftaran: [], anggota: [], koordinator: [], alumni_pembina: [], administrasi: [], keuangan: [], kas_tim: [], raport: [], program_kerja: [], agenda: [], evaluasi: [], admin: [], absensi: []
+        };
+
+        let kategoriArsipAktif = "anggota";
+        let editIdAktif = null;
+        let loginRole = "admin"; // default tab
+        let userRole = "visitor"; 
+        let loggedMemberData = null;
+
+        // Pagination State
+        let currentPage = 1;
+        const rowsPerPage = 10;
+
+        const listBulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+        
+        // --- AUTH LOGIC ---
+        function switchLoginTab(role) {
+            loginRole = role;
+            document.getElementById('tab-admin').className = role === 'admin' ? 'px-6 py-2 rounded-lg text-xs font-bold transition-all bg-blue-600 text-white shadow-sm' : 'px-6 py-2 rounded-lg text-xs font-bold transition-all text-slate-500';
+            document.getElementById('tab-anggota').className = role === 'anggota' ? 'px-6 py-2 rounded-lg text-xs font-bold transition-all bg-blue-600 text-white shadow-sm' : 'px-6 py-2 rounded-lg text-xs font-bold transition-all text-slate-500';
+            document.getElementById('login-user').placeholder = role === 'admin' ? "Masukkan Username" : "Masukkan Nama Lengkap";
+            document.getElementById('login-pass').placeholder = role === 'admin' ? "Masukkan Password" : "Masukkan Nomor WhatsApp";
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const u = document.getElementById('login-user').value;
+            const p = document.getElementById('login-pass').value;
+
+            if (loginRole === 'admin') {
+                if (u === 'curva skaliska' && p === '123456') {
+                    proceedLogin('superadmin', "Super Admin", null);
+                    return;
+                }
+                const ad = storageOrganisasi.admin.find(x => x.user === u && x.pass === p);
+                if (ad) { proceedLogin('admin', "Admin", null); return; }
+            } else {
+                const agt = storageOrganisasi.anggota.find(x => x.nama_lengkap.toLowerCase() === u.toLowerCase() && x.whatsapp === p);
+                if (agt) { proceedLogin('member', "Anggota Massa Tetap", agt); return; }
+            }
+            alert("Kredensial tidak valid!");
+        }
+
+        function proceedLogin(role, label, memberObj) {
+            userRole = role;
+            loggedMemberData = memberObj;
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('app-content').classList.remove('hidden');
+            document.getElementById('label-role-user').innerText = "Status: " + label;
+            
+            if (role === 'member') {
+                document.querySelectorAll('.admin-only').forEach(el => el.classList.add('hidden'));
+                document.getElementById('super-admin-menu').classList.add('hidden');
+            } else if (role === 'admin') {
+                document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
+                document.getElementById('super-admin-menu').classList.add('hidden');
+            } else {
+                document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
+                document.getElementById('super-admin-menu').classList.remove('hidden');
+            }
+            inisialisasiDataRealtime();
+        }
+
+        function toggleRegister(show) {
+            document.getElementById('login-form-container').classList.toggle('hidden', show);
+            document.getElementById('register-form-container').classList.toggle('hidden', !show);
+            if(show) renderRegisterFields();
+        }
+
+        function renderRegisterFields() {
+            const wadah = document.getElementById('wadah-register-fields');
+            wadah.innerHTML = `
+                <div><label class="block text-xs font-bold text-slate-600 mb-1">Nama Lengkap</label><input type="text" id="r_nama" required class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5"></div>
+                <div><label class="block text-xs font-bold text-slate-600 mb-1">Gender</label><select id="r_gender" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5"><option value="Putra">Putra</option><option value="Putri">Putri</option></select></div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Tempat Lahir</label><input type="text" id="r_tempat" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Tgl Lahir</label><input type="date" id="r_tgl" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5"></div>
+                </div>
+                <div><label class="block text-xs font-bold text-slate-600 mb-1">Kelas</label><input type="text" id="r_kelas" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5"></div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Angkatan</label><input type="text" id="r_angkatan" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Tahun Daftar</label><input type="number" id="r_tahun" value="2026" class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5"></div>
+                </div>
+                <div><label class="block text-xs font-bold text-slate-600 mb-1">WhatsApp (Kunci Login)</label><input type="number" id="r_wa" placeholder="628..." required class="w-full text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5"></div>
+                <div><label class="block text-xs font-bold text-slate-600 mb-1">Upload Foto</label><input type="file" id="r_foto" accept="image/*" class="w-full text-[10px]"></div>
+            `;
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button');
+            btn.disabled = true;
+            btn.innerText = "Mengirim...";
+            const toBase64 = f => new Promise((res) => { if(!f) res(""); const r = new FileReader(); r.readAsDataURL(f); r.onload = () => res(r.result); });
+            const fotoFile = document.getElementById('r_foto').files[0];
+            const id = Date.now();
+            const data = {
+                id: id, nama: document.getElementById('r_nama').value, gender: document.getElementById('r_gender').value, tempat_lahir: document.getElementById('r_tempat').value, tanggal_lahir: document.getElementById('r_tgl').value, kelas: document.getElementById('r_kelas').value, angkatan: document.getElementById('r_angkatan').value, tahun_daftar: document.getElementById('r_tahun').value, whatsapp: document.getElementById('r_wa').value, foto: await toBase64(fotoFile)
+            };
+            try {
+                await database.ref('administrasi_digital/pendaftaran/' + id).set(data);
+                document.getElementById('modal-success').classList.remove('hidden');
+                setTimeout(() => { document.getElementById('modal-success').classList.add('hidden'); toggleRegister(false); }, 1500);
+            } catch (err) { alert(err.message); }
+            btn.disabled = false; btn.innerText = "Kirim Pendaftaran";
+        }
+
+        // --- CORE FUNCTIONS ---
+        const generateOpsiTahun = (start=2023, end=3000) => {
+            let html = ""; for(let y=start; y<=end; y++) html += `<option value="${y}">${y}</option>`; return html;
+        };
+
+        function logoutSistem() { location.reload(); }
+
+        // FUNGSI TOGGLE DESKTOP MODE
+        function toggleDesktopMode() {
+            const app = document.getElementById('app-content');
+            if (app.classList.contains('max-w-md')) {
+                app.classList.remove('max-w-md');
+                app.classList.add('max-w-5xl');
+            } else {
+                app.classList.remove('max-w-5xl');
+                app.classList.add('max-w-md');
+            }
+        }
+
+        function inisialisasiDataRealtime() {
+            database.ref('administrasi_digital').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    Object.keys(storageOrganisasi).forEach(key => storageOrganisasi[key] = data[key] ? Object.values(data[key]) : []);
+                } else {
+                    Object.keys(storageOrganisasi).forEach(key => storageOrganisasi[key] = []);
+                }
+                segarkanDashboardStatistik();
+                updateLogikaNotifikasi();
+                if (!document.getElementById('page-arsip-view').classList.contains('hidden')) renderListArsip();
+            });
+        }
+
+        database.ref('administrasi_digital').once('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) { Object.keys(storageOrganisasi).forEach(key => storageOrganisasi[key] = data[key] ? Object.values(data[key]) : []); }
+        });
+
+        function switchPage(pageId) {
+            ['page-statistik', 'page-form', 'page-arsip-view'].forEach(id => document.getElementById(id).classList.add('hidden'));
+            document.getElementById(pageId).classList.remove('hidden');
+        }
+
+        function pilihMenu(pageId) { 
+            switchPage(pageId); 
+            if (pageId === 'page-form') { editIdAktif = null; document.getElementById('form-title').innerText = "Form Input Data Terpadu"; renderFormFields(); }
+            toggleSidebar(false); 
+        }
+
+        function toggleSidebar(buka) {
+            document.getElementById('sidebar-menu').classList.toggle('-translate-x-full', !buka);
+            document.getElementById('sidebar-overlay').classList.toggle('hidden', !buka);
+        }
+
+        function bukaHalamanArsip(kategori) {
+            kategoriArsipAktif = kategori;
+            currentPage = 1; // Reset page
+            let displayJudul = kategori.replace(/_/g, ' ');
+            if (kategori === 'kas_tim') displayJudul = 'Pembayaran Member';
+            document.getElementById('judul-halaman-arsip').innerText = `Data ${displayJudul}`;
+            switchPage('page-arsip-view');
+            renderListArsip();
+            toggleSidebar(false);
+        }
+
+        function ubahHalaman(offset) {
+            currentPage += offset;
+            renderListArsip();
+        }
+
+        function bukaPopUpFoto(src, nama) {
+            const modal = document.getElementById('modal-foto');
+            document.getElementById('preview-foto-besar').src = src;
+            document.getElementById('preview-nama-foto').innerText = nama;
+            modal.classList.remove('hidden');
+        }
+        function tutupPopUpFoto() { document.getElementById('modal-foto').classList.add('hidden'); }
+
+        // --- NOTIFIKASI LOGIC ---
+        function updateLogikaNotifikasi() {
+            const today = new Date();
+            const threeDaysFromNow = new Date();
+            threeDaysFromNow.setDate(today.getDate() + 3);
+
+            const filteredAgenda = storageOrganisasi.agenda.filter(a => {
+                const eventDate = new Date(a.tanggal);
+                return eventDate >= today && eventDate <= threeDaysFromNow;
+            });
+
+            const filteredProker = storageOrganisasi.program_kerja.filter(p => {
+                return p.status === 'Belum Terlaksana';
+            });
+
+            const dot = document.getElementById('notif-dot');
+            if (filteredAgenda.length > 0 || filteredProker.length > 0) {
+                dot.style.display = 'block';
+            } else {
+                dot.style.display = 'none';
+            }
+        }
+
+        function tampilkanNotifikasi() {
+            const today = new Date();
+            const threeDaysFromNow = new Date();
+            threeDaysFromNow.setDate(today.getDate() + 3);
+
+            const filteredAgenda = storageOrganisasi.agenda.filter(a => {
+                const eventDate = new Date(a.tanggal);
+                return eventDate >= today && eventDate <= threeDaysFromNow;
+            });
+
+            const wadah = document.getElementById('wadah-list-notif');
+            wadah.innerHTML = "";
+
+            if (filteredAgenda.length === 0 && storageOrganisasi.program_kerja.filter(p => p.status === 'Belum Terlaksana').length === 0) {
+                wadah.innerHTML = "<p class='text-center text-xs text-slate-400 py-4'>Tidak ada kegiatan mendesak.</p>";
+            }
+
+            filteredAgenda.forEach(a => {
+                wadah.innerHTML += `
+                    <div class="bg-amber-50 p-3 rounded-xl border border-amber-200">
+                        <p class="text-[10px] font-bold text-amber-700 uppercase">Agenda Mendatang</p>
+                        <p class="text-xs font-bold text-slate-800">${a.nama_agenda}</p>
+                        <p class="text-[10px] text-slate-500"><i class="fa-solid fa-calendar mr-1"></i> ${a.tanggal} | ${a.lokasi}</p>
+                    </div>
+                `;
+            });
+
+            storageOrganisasi.program_kerja.filter(p => p.status === 'Belum Terlaksana').forEach(p => {
+                wadah.innerHTML += `
+                    <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200">
+                        <p class="text-[10px] font-bold text-emerald-700 uppercase">Proker Belum Selesai</p>
+                        <p class="text-xs font-bold text-slate-800">${p.nama_program}</p>
+                        <p class="text-[10px] text-slate-500">Target: ${p.target_sasaran}</p>
+                    </div>
+                `;
+            });
+
+            document.getElementById('modal-notif').classList.remove('hidden');
+        }
+
+        function tutupNotifikasi() { document.getElementById('modal-notif').classList.add('hidden'); }
+
+        function renderFormFields() {
+            const kategori = document.getElementById('kategoriUtama').value;
+            const wadah = document.getElementById('wadah-input-dinamis');
+            wadah.innerHTML = "";
+            let opsiAnggota = storageOrganisasi.anggota.map(a => `<option value="${a.nama_lengkap}">${a.nama_lengkap}</option>`).join('');
+            let opsiBulan = listBulan.map(b => `<option value="${b}">${b}</option>`).join('');
+
+            if (kategori === "pendaftaran") {
+                wadah.innerHTML = `
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Nama</label><input type="text" id="f_nama" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Gender</label><select id="f_gender" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"><option value="Putra">Putra</option><option value="Putri">Putri</option></select></div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block text-xs font-bold text-slate-600 mb-1">Tempat Lahir</label><input type="text" id="f_tempat" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                        <div><label class="block text-xs font-bold text-slate-600 mb-1">Tgl Lahir</label><input type="date" id="f_tgl" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    </div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Kelas</label><input type="text" id="f_kelas" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block text-xs font-bold text-slate-600 mb-1">Angkatan</label><input type="text" id="f_angkatan" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                        <div><label class="block text-xs font-bold text-slate-600 mb-1">Tahun Daftar</label><input type="number" id="f_tahun" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    </div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">WhatsApp</label><input type="number" id="f_wa" placeholder="628..." class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Upload Foto</label><input type="file" id="up_foto" accept="image/*" class="w-full text-[10px] border rounded-lg p-1"></div>
+                `;
+            } else if (kategori === "anggota") {
+                wadah.innerHTML = `
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Nama</label><input type="text" id="f_nama" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Gender</label><select id="f_gender" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"><option value="Putra">Putra</option><option value="Putri">Putri</option></select></div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block text-xs font-bold text-slate-600 mb-1">Tempat Lahir</label><input type="text" id="f_tempat" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                        <div><label class="block text-xs font-bold text-slate-600 mb-1">Tgl Lahir</label><input type="date" id="f_tgl" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    </div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Kelas</label><input type="text" id="f_kelas" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Angkatan</label><input type="text" id="f_angkatan" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">WhatsApp</label><input type="number" id="f_wa" placeholder="628..." class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Upload Foto</label><input type="file" id="up_foto" accept="image/*" class="w-full text-[10px] border rounded-lg p-1"></div>
+                `;
+            } else if (kategori === "koordinator") {
+                wadah.innerHTML = `
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Nama</label><input type="text" id="f_nama" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Gender</label><select id="f_gender" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"><option value="Putra">Putra</option><option value="Putri">Putri</option></select></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Kelas</label><input type="text" id="f_kelas" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">WhatsApp</label><input type="number" id="f_wa" placeholder="628..." class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Jabatan</label><input type="text" id="f_jabatan" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Upload Foto</label><input type="file" id="up_foto" accept="image/*" class="w-full text-[10px] border rounded-lg p-1"></div>
+                `;
+            } else if (kategori === "alumni_pembina") {
+                wadah.innerHTML = `
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Status</label><select id="f_status_ap" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"><option value="Alumni">Alumni</option><option value="Pembina">Pembina</option></select></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Nama</label><input type="text" id="f_nama_ap" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Gender</label><select id="f_gender_ap" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"><option value="Putra">Putra</option><option value="Putri">Putri</option></select></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">WhatsApp</label><input type="number" id="f_wa_ap" placeholder="628..." required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Upload Foto</label><input type="file" id="up_foto_ap" accept="image/*" class="w-full text-[10px] border rounded-lg p-1"></div>
+                `;
+            } else if (kategori === "administrasi") {
+                wadah.innerHTML = `
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block text-xs font-bold text-slate-600 mb-1">Tanggal</label><input type="date" id="f_tgl_admin" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                        <div><label class="block text-xs font-bold text-slate-600 mb-1">Kategori</label><select id="f_kat_admin" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"><option value="Surat Masuk">Surat Masuk</option><option value="Surat Keluar">Surat Keluar</option></select></div>
+                    </div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Jenis Surat</label><select id="f_jenis_surat" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"><option value="Surat Digital">Surat Digital</option><option value="Surat Fisik">Surat Fisik</option></select></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Sub Surat</label><input type="text" id="f_sub_admin" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Nomor Surat</label><input type="text" id="f_nomor_admin" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">File Berkas</label><input type="file" id="up_file_admin" accept=".jpg,.jpeg,.png,.pdf" class="w-full text-[10px] border rounded-lg p-1"></div>
+                `;
+            } else if (kategori === "absensi") {
+                wadah.innerHTML = `
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Nama Anggota</label><select id="field_nama_absensi" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2">${opsiAnggota}</select></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Keterangan</label><select id="field_status_absensi" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"><option value="Hadir">Hadir</option><option value="Sakit">Sakit</option><option value="Izin">Izin</option><option value="Alpa">Alpa</option></select></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Materi</label><textarea id="f_materi_absensi" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2" rows="2"></textarea></div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block text-xs font-bold text-slate-600 mb-1">Bulan</label><select id="field_bulan_absensi" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2">${opsiBulan}</select></div>
+                        <div><label class="block text-xs font-bold text-slate-600 mb-1">Tahun</label><select id="field_tahun_absensi" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2">${generateOpsiTahun()}</select></div>
+                    </div>
+                `;
+            } else if (kategori === "keuangan") {
+                wadah.innerHTML = `
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Tipe</label><select id="field_tipe_keu" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"><option value="pemasukan">Pemasukan</option><option value="pengeluaran">Pengeluaran</option></select></div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block text-[10px] font-bold text-slate-500">Tanggal</label><input type="date" id="field_tgl_keu" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                        <div><label class="block text-[10px] font-bold text-slate-500">Nominal</label><input type="number" id="field_nominal_keu" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    </div>
+                    <div><label class="block text-[10px] font-bold text-slate-500">Keterangan</label><input type="text" id="field_ket_keu" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Upload Bukti</label><input type="file" id="up_file_keu" accept="image/*" class="w-full text-[10px] border rounded-lg p-1"></div>
+                `;
+            } else if (kategori === "kas_tim") {
+                wadah.innerHTML = `
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Pilih Anggota</label><select id="field_nama" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2">${opsiAnggota}</select></div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div><label class="block text-xs font-bold text-slate-600">Tanggal</label><input type="date" id="field_tgl_kas" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                        <div><label class="block text-xs font-bold text-slate-600">Nominal</label><input type="number" id="field_nominal_kas" value="10000" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    </div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Jenis Pembayaran</label><select id="field_jenis_kas" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"><option value="Tunai">Tunai</option><option value="Non Tunai">Non Tunai</option></select></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Upload Bukti</label><input type="file" id="up_file_kas" accept="image/*" class="w-full text-[10px] border rounded-lg p-1"></div>
+                `;
+            } else if (kategori === "program_kerja") {
+                wadah.innerHTML = `
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Nama Program</label><input type="text" id="f_nama_proker" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Target</label><input type="text" id="f_target_proker" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Status</label><select id="f_status_proker" class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"><option value="Terlaksana">Terlaksana</option><option value="Belum Terlaksana">Belum Terlaksana</option></select></div>
+                `;
+            } else if (kategori === "agenda") {
+                wadah.innerHTML = `
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Nama Agenda</label><input type="text" id="f_nama_agenda" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Tanggal</label><input type="date" id="f_tgl_agenda" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Penanggung Jawab</label><input type="text" id="f_pj_agenda" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Lokasi</label><input type="text" id="f_lokasi_agenda" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Upload File Berkas</label><input type="file" id="up_file_agenda" accept=".jpg,.jpeg,.png,.pdf" class="w-full text-[10px] border rounded-lg p-1"></div>
+                `;
+            } else if (kategori === "evaluasi") {
+                wadah.innerHTML = `
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Nama Kegiatan</label><input type="text" id="f_kegiatan_eval" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Tanggal</label><input type="date" id="f_tgl_eval" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Keterangan</label><textarea id="f_ket_eval" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2" rows="2"></textarea></div>
+                    <div><label class="block text-xs font-bold text-slate-600 mb-1">Perbaikan</label><textarea id="f_perbaikan_eval" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2" rows="2"></textarea></div>
+                `;
+            } else if (kategori === "admin") {
+                wadah.innerHTML = `<div><label class="block text-xs font-bold text-slate-600 mb-1">User</label><input type="text" id="field_user_admin" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div><div><label class="block text-xs font-bold text-slate-600 mb-1">Pass</label><input type="text" id="field_pass_admin" required class="w-full text-xs bg-white border border-slate-200 rounded-xl px-3 py-2"></div>`;
+            }
+        }
+
+        async function prosesSimpanData(event) {
+            event.preventDefault();
+            const btn = document.getElementById('btnSimpanSistem');
+            const kategori = document.getElementById('kategoriUtama').value;
+            let idFinal = editIdAktif ? editIdAktif : Date.now();
+            let dataEntri = { id: idFinal };
+            btn.disabled = true;
+            const toBase64 = f => new Promise((res) => { if(!f) res(""); const r = new FileReader(); r.readAsDataURL(f); r.onload = () => res(r.result); });
+            try {
+                if (kategori === "pendaftaran") {
+                    const fFoto = document.getElementById('up_foto').files[0];
+                    dataEntri = { ...dataEntri, nama: f_nama.value, gender: f_gender.value, tempat_lahir: f_tempat.value, tanggal_lahir: f_tgl.value, kelas: f_kelas.value, angkatan: f_angkatan.value, tahun_daftar: f_tahun.value, whatsapp: f_wa.value, foto: await toBase64(fFoto) };
+                } else if (kategori === "anggota") {
+                    const fFoto = document.getElementById('up_foto').files[0];
+                    dataEntri = { ...dataEntri, nama_lengkap: f_nama.value, gender: f_gender.value, tempat_lahir: f_tempat.value, tanggal_lahir: f_tgl.value, kelas: f_kelas.value, angkatan: f_angkatan.value, whatsapp: f_wa.value, foto: await toBase64(fFoto) };
+                } else if (kategori === "koordinator") {
+                    const fFoto = document.getElementById('up_foto').files[0];
+                    dataEntri = { ...dataEntri, nama: f_nama.value, gender: f_gender.value, kelas: f_kelas.value, whatsapp: f_wa.value, jabatan: f_jabatan.value, foto: await toBase64(fFoto) };
+                } else if (kategori === "alumni_pembina") {
+                    const fFoto = document.getElementById('up_foto_ap').files[0];
+                    dataEntri = { ...dataEntri, status: f_status_ap.value, nama: f_nama_ap.value, gender: f_gender_ap.value, whatsapp: f_wa_ap.value, foto: await toBase64(fFoto) };
+                } else if (kategori === "administrasi") {
+                    const fFile = document.getElementById('up_file_admin').files[0];
+                    dataEntri = { ...dataEntri, tanggal: f_tgl_admin.value, kategori_surat: f_kat_admin.value, jenis_surat: f_jenis_surat.value, sub_surat: f_sub_admin.value, nomor_surat: f_nomor_admin.value, file: await toBase64(fFile) };
+                } else if (kategori === "absensi") {
+                    dataEntri = { ...dataEntri, nama: field_nama_absensi.value, kehadiran: field_status_absensi.value, materi: f_materi_absensi.value, bulan: field_bulan_absensi.value, tahun: field_tahun_absensi.value };
+                } else if (kategori === "keuangan") {
+                    const fFileKeu = document.getElementById('up_file_keu').files[0];
+                    dataEntri = { ...dataEntri, tipe: field_tipe_keu.value, tanggal: field_tgl_keu.value, nominal: field_nominal_keu.value, keterangan: field_ket_keu.value, file: await toBase64(fFileKeu) };
+                } else if (kategori === "kas_tim") {
+                    const fFileKas = document.getElementById('up_file_kas').files[0];
+                    dataEntri = { ...dataEntri, nama: field_nama.value, tanggal: field_tgl_kas.value, nominal: field_nominal_kas.value, jenis_pembayaran: field_jenis_kas.value, file: await toBase64(fFileKas) };
+                } else if (kategori === "program_kerja") {
+                    dataEntri = { ...dataEntri, nama_program: f_nama_proker.value, target_sasaran: f_target_proker.value, status: f_status_proker.value };
+                } else if (kategori === "agenda") {
+                    const fFileAgenda = document.getElementById('up_file_agenda').files[0];
+                    dataEntri = { ...dataEntri, nama_agenda: f_nama_agenda.value, tanggal: f_tgl_agenda.value, pj: f_pj_agenda.value, lokasi: f_lokasi_agenda.value, file: await toBase64(fFileAgenda) };
+                } else if (kategori === "evaluasi") {
+                    dataEntri = { ...dataEntri, nama_kegiatan: f_kegiatan_eval.value, tanggal: f_tgl_eval.value, keterangan: f_ket_eval.value, perbaikan: f_perbaikan_eval.value };
+                } else if (kategori === "admin") {
+                    dataEntri = { ...dataEntri, user: field_user_admin.value, pass: field_pass_admin.value };
+                }
+                await database.ref('administrasi_digital/' + kategori + '/' + idFinal).set(dataEntri);
+                btn.disabled = false; document.getElementById('modal-success').classList.remove('hidden');
+                setTimeout(() => { document.getElementById('modal-success').classList.add('hidden'); bukaHalamanArsip(kategori); }, 1000);
+            } catch (err) { alert(err.message); btn.disabled = false; }
+        }
+
+        async function aksiKonfirmasiPendaftaran(id) {
+            if(!confirm("Pindahkan pendaftar ini ke Anggota Massa Tetap?")) return;
+            const data = storageOrganisasi.pendaftaran.find(x => x.id == id);
+            if(!data) return;
+            const dataBaru = {
+                id: data.id,
+                nama_lengkap: data.nama,
+                gender: data.gender,
+                tempat_lahir: data.tempat_lahir || "",
+                tanggal_lahir: data.tanggal_lahir || "",
+                kelas: data.kelas || "",
+                whatsapp: data.whatsapp || "",
+                foto: data.foto || "",
+                angkatan: data.angkatan || ""
+            };
+            try {
+                await database.ref('administrasi_digital/anggota/' + data.id).set(dataBaru);
+                await database.ref('administrasi_digital/pendaftaran/' + id).remove();
+                alert("Berhasil dikonfirmasi!");
+            } catch(e) { alert(e.message); }
+        }
+
+        function renderListArsip() {
+            const wadah = document.getElementById('container-list-arsip');
+            let data = storageOrganisasi[kategoriArsipAktif];
+            document.getElementById('akumulasi-khusus-container').classList.add('hidden');
+            
+            if(kategoriArsipAktif === 'raport') { renderRaportSummary(); return; }
+            if(!data || data.length === 0) { 
+                wadah.innerHTML = `<div class="p-8 text-center text-slate-400 text-[10px] font-bold">Tabel Kosong</div>`; 
+                document.getElementById('pagination-controls').classList.add('hidden');
+                return; 
+            }
+
+            const kueri = document.getElementById('inputCariArsip').value.toLowerCase();
+            if(kueri) {
+                data = data.filter(item => JSON.stringify(item).toLowerCase().includes(kueri));
+            }
+
+            const totalPages = Math.ceil(data.length / rowsPerPage);
+            if (currentPage > totalPages) currentPage = Math.max(1, totalPages);
+            const start = (currentPage - 1) * rowsPerPage;
+            const end = start + rowsPerPage;
+            const paginatedData = data.slice(start, end);
+
+            document.getElementById('pagination-controls').classList.remove('hidden');
+            document.getElementById('btn-prev').disabled = currentPage === 1;
+            document.getElementById('btn-next').disabled = currentPage === totalPages;
+            document.getElementById('info-halaman').innerText = `Hal ${currentPage} dari ${totalPages}`;
+
+            let html = `<table><thead><tr><th>No</th>`;
+            const sample = data[0]; const keys = Object.keys(sample).filter(k => k !== 'id' && k !== 'foto' && k !== 'file');
+            if(sample.foto !== undefined) html += `<th>Foto</th>`;
+            if(sample.file !== undefined) html += `<th>File</th>`;
+            keys.forEach(k => html += `<th>${k.replace(/_/g, ' ')}</th>`);
+            html += `<th>Aksi</th></tr></thead><tbody>`;
+            
+            paginatedData.forEach((item, index) => {
+                html += `<tr><td>${start + index + 1}</td>`;
+                if(item.foto !== undefined) html += `<td><img src="${item.foto || 'https://via.placeholder.com/50'}" class="img-circle" onclick="bukaPopUpFoto('${item.foto}', '${item.nama || item.nama_lengkap}')"></td>`;
+                if(item.file !== undefined) html += `<td><button class="text-emerald-600 font-bold" onclick="bukaPopUpFoto('${item.file}', 'Berkas Digital')"><i class="fa-solid fa-file-pdf"></i> Lihat</button></td>`;
+                keys.forEach(k => html += `<td>${item[k]}</td>`);
+                
+                html += `<td class="flex gap-1">`;
+                if(kategoriArsipAktif === 'pendaftaran') {
+                    html += `<button onclick="aksiKonfirmasiPendaftaran('${item.id}')" class="text-emerald-500 mr-2"><i class="fa-solid fa-circle-check"></i></button>`;
+                }
+                html += `<button onclick="aksiHapusData('${kategoriArsipAktif}','${item.id}')" class="text-rose-500"><i class="fa-solid fa-trash"></i></button></td></tr>`;
+            });
+            html += `</tbody></table>`; wadah.innerHTML = html;
+            if(kategoriArsipAktif === 'kas_tim') renderAkumulasiKas();
+        }
+
+        function renderRaportSummary() {
+            const wadah = document.getElementById('container-list-arsip');
+            let dataAnggota = userRole === 'member' ? [loggedMemberData] : storageOrganisasi.anggota;
+            
+            if (dataAnggota.length === 0 || !dataAnggota[0]) {
+                wadah.innerHTML = "<p class='p-4 text-center text-xs'>Data Anggota Tidak Tersedia</p>";
+                return;
+            }
+
+            let html = `<table><thead><tr><th>No</th><th>Nama Anggota</th><th>Kelas</th><th>Angkatan</th></tr></thead><tbody>`;
+            dataAnggota.forEach((agt, idx) => {
+                html += `<tr>
+                    <td>${idx + 1}</td>
+                    <td class="font-bold text-blue-600 cursor-pointer" onclick="downloadRaportPDF_User('${agt.id}')">${agt.nama_lengkap}</td>
+                    <td>${agt.kelas || '-'}</td>
+                    <td>${agt.angkatan || '-'}</td>
+                </tr>`;
+            });
+            html += `</tbody></table>`; wadah.innerHTML = html;
+            document.getElementById('pagination-controls').classList.add('hidden');
+        }
+
+        function downloadRaportPDF_User(memberId) {
+            const agt = storageOrganisasi.anggota.find(x => x.id == memberId);
+            if (!agt) return;
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = doc.internal.pageSize.getWidth();
+
+            // Header
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(14);
+            doc.text("RAPORT ANGGOTA MASSA TETAP", pageWidth/2, 20, { align: 'center' });
+            doc.text("CURVA SUD SKALISKA", pageWidth/2, 27, { align: 'center' });
+            
+            doc.setLineWidth(0.5);
+            doc.line(20, 32, pageWidth - 20, 32);
+
+            // Biodata
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
+            let y = 42;
+            const labelX = 25;
+            const valueX = 65;
+
+            const bios = [
+                ["Nama Lengkap", agt.nama_lengkap],
+                ["Gender", agt.gender],
+                ["Kelas", agt.kelas],
+                ["Angkatan", agt.angkatan || "-"],
+                ["Tempat, Tgl Lahir", `${agt.tempat_lahir || "-"}, ${agt.tanggal_lahir || "-"}`],
+                ["WhatsApp", agt.whatsapp]
+            ];
+
+            bios.forEach(b => {
+                doc.setFont("helvetica", "bold");
+                doc.text(b[0], labelX, y);
+                doc.text(":", valueX - 5, y);
+                doc.setFont("helvetica", "normal");
+                doc.text(String(b[1]), valueX, y);
+                y += 7;
+            });
+
+            // Tabel 1: Rekap Pembayaran
+            y += 10;
+            doc.setFont("helvetica", "bold");
+            doc.text("REKAPITULASI PEMBAYARAN MEMBER (KAS)", 25, y);
+            
+            const myKas = storageOrganisasi.kas_tim.filter(k => k.nama === agt.nama_lengkap);
+            const kasData = myKas.map((k, i) => [i+1, k.tanggal, k.jenis_pembayaran, `Rp ${parseFloat(k.nominal).toLocaleString('id-ID')}`]);
+
+            doc.autoTable({
+                startY: y + 3,
+                head: [['No', 'Tanggal', 'Metode', 'Nominal']],
+                body: kasData.length > 0 ? kasData : [['-', 'Belum ada data', '-', '-']],
+                margin: { left: 25, right: 25 },
+                theme: 'grid',
+                headStyles: { fillColor: [16, 185, 129] },
+                styles: { fontSize: 8 }
+            });
+
+            // Tabel 2: Rekap Kehadiran
+            y = doc.lastAutoTable.finalY + 10;
+            doc.setFont("helvetica", "bold");
+            doc.text("REKAPITULASI KEHADIRAN (ABSENSI)", 25, y);
+
+            const myAbs = storageOrganisasi.absensi.filter(a => a.nama === agt.nama_lengkap);
+            const absData = myAbs.map((a, i) => [i+1, `${a.bulan} ${a.tahun}`, a.materi, a.kehadiran]);
+
+            doc.autoTable({
+                startY: y + 3,
+                head: [['No', 'Periode', 'Materi', 'Status']],
+                body: absData.length > 0 ? absData : [['-', 'Belum ada data', '-', '-']],
+                margin: { left: 25, right: 25 },
+                theme: 'grid',
+                headStyles: { fillColor: [59, 130, 246] },
+                styles: { fontSize: 8 }
+            });
+
+            doc.save(`Raport_${agt.nama_lengkap}.pdf`);
+        }
+
+        function segarkanDashboardStatistik() {
+            const wadah = document.getElementById('dashboard-content');
+            
+            if (userRole !== 'member') {
+                // DATA CALCULATION
+                const totalPendaftaran = storageOrganisasi.pendaftaran.length;
+                const totalAnggota = storageOrganisasi.anggota.length;
+                const anggotaPutra = storageOrganisasi.anggota.filter(a => a.gender === 'Putra').length;
+                const anggotaPutri = storageOrganisasi.anggota.filter(a => a.gender === 'Putri').length;
+                
+                const totalKoordinator = storageOrganisasi.koordinator.length;
+                const totalPembina = storageOrganisasi.alumni_pembina.filter(x => x.status === 'Pembina').length;
+                const totalAlumni = storageOrganisasi.alumni_pembina.filter(x => x.status === 'Alumni').length;
+                
+                const totalAgenda = storageOrganisasi.agenda.length;
+                const prokerSelesai = storageOrganisasi.program_kerja.filter(p => p.status === 'Terlaksana').length;
+                const prokerBelum = storageOrganisasi.program_kerja.filter(p => p.status === 'Belum Terlaksana').length;
+                
+                const suratMasuk = storageOrganisasi.administrasi.filter(s => s.kategori_surat === 'Surat Masuk').length;
+                const suratKeluar = storageOrganisasi.administrasi.filter(s => s.kategori_surat === 'Surat Keluar').length;
+                
+                const totalEvaluasi = storageOrganisasi.evaluasi.length;
+
+                let masuk = 0, keluar = 0, kasTim = 0;
+                storageOrganisasi.keuangan.forEach(k => k.tipe === 'pemasukan' ? masuk += parseFloat(k.nominal || 0) : keluar += parseFloat(k.nominal || 0));
+                storageOrganisasi.kas_tim.forEach(k => kasTim += parseFloat(k.nominal || 0));
+                const totalPemasukan = masuk + kasTim;
+                const saldoAkhir = totalPemasukan - keluar;
+
+                wadah.innerHTML = `
+                    <!-- BARIS 1: PENDAFTARAN & ANGGOTA -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div onclick="bukaHalamanArsip('pendaftaran')" class="cursor-pointer bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Jumlah Pendaftaran</p>
+                            <p class="text-2xl font-black text-emerald-600">${totalPendaftaran}</p>
+                            <p class="text-[8px] text-slate-400 font-medium">Data Calon Anggota</p>
+                        </div>
+                        <div onclick="bukaHalamanArsip('anggota')" class="cursor-pointer bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Jumlah Anggota</p>
+                            <p class="text-2xl font-black text-blue-600">${totalAnggota}</p>
+                            <div class="flex gap-2 mt-1">
+                                <span class="text-[8px] font-bold bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">Putra: ${anggotaPutra}</span>
+                                <span class="text-[8px] font-bold bg-rose-50 text-rose-600 px-1.5 py-0.5 rounded">Putri: ${anggotaPutri}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- BARIS 2: KOORDINATOR & PEMBINA/ALUMNI -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div onclick="bukaHalamanArsip('koordinator')" class="cursor-pointer bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Jumlah Koordinator</p>
+                            <p class="text-2xl font-black text-indigo-600">${totalKoordinator}</p>
+                            <p class="text-[8px] text-slate-400 font-medium">Struktur Kepengurusan</p>
+                        </div>
+                        <div onclick="bukaHalamanArsip('alumni_pembina')" class="cursor-pointer bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Pembina & Alumni</p>
+                            <p class="text-2xl font-black text-slate-700">${totalPembina + totalAlumni}</p>
+                            <div class="flex gap-2 mt-1">
+                                <span class="text-[8px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">Pembina: ${totalPembina}</span>
+                                <span class="text-[8px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">Alumni: ${totalAlumni}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- BARIS 3: SURAT & AGENDA -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div onclick="bukaHalamanArsip('administrasi')" class="cursor-pointer bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Jumlah Surat</p>
+                            <p class="text-2xl font-black text-amber-600">${suratMasuk + suratKeluar}</p>
+                            <div class="flex gap-2 mt-1">
+                                <span class="text-[8px] font-bold text-emerald-600">Masuk: ${suratMasuk}</span>
+                                <span class="text-[8px] font-bold text-rose-600">Keluar: ${suratKeluar}</span>
+                            </div>
+                        </div>
+                        <div onclick="bukaHalamanArsip('agenda')" class="cursor-pointer bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Jumlah Agenda</p>
+                            <p class="text-2xl font-black text-teal-600">${totalAgenda}</p>
+                            <p class="text-[8px] text-slate-400 font-medium">Kegiatan Terjadwal</p>
+                        </div>
+                    </div>
+
+                    <!-- BARIS 4: PROKER & EVALUASI -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div onclick="bukaHalamanArsip('program_kerja')" class="cursor-pointer bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Program Kerja</p>
+                            <p class="text-2xl font-black text-sky-600">${prokerSelesai + prokerBelum}</p>
+                            <div class="flex flex-col mt-1">
+                                <span class="text-[8px] font-bold text-emerald-600">Selesai: ${prokerSelesai}</span>
+                                <span class="text-[8px] font-bold text-rose-500">Belum Selesai: ${prokerBelum}</span>
+                            </div>
+                        </div>
+                        <!-- EVALUASI DENGAN BLOCK MERAH -->
+                        <div onclick="bukaHalamanArsip('evaluasi')" class="cursor-pointer bg-rose-600 p-4 rounded-2xl border border-rose-700 shadow-lg">
+                            <p class="text-[9px] font-bold text-rose-100 uppercase tracking-tight">Jumlah Evaluasi</p>
+                            <p class="text-2xl font-black text-white">${totalEvaluasi}</p>
+                            <p class="text-[8px] text-rose-200 font-medium italic">Laporan Kendala Sistem</p>
+                        </div>
+                    </div>
+
+                    <!-- KEUANGAN -->
+                    <div onclick="bukaHalamanArsip('keuangan')" class="cursor-pointer bg-slate-900 p-5 rounded-3xl shadow-xl text-white relative overflow-hidden">
+                        <div class="absolute -right-4 -top-4 opacity-10 text-6xl">
+                            <i class="fa-solid fa-wallet"></i>
+                        </div>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase mb-1 tracking-widest">Saldo Kas Organisasi</p>
+                        <p class="text-3xl font-black text-emerald-400 mb-4">Rp ${saldoAkhir.toLocaleString('id-ID')}</p>
+                        <div class="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
+                            <div>
+                                <p class="text-[8px] text-slate-500 uppercase font-bold mb-1">Total Pemasukan</p>
+                                <p class="text-xs font-bold text-emerald-300">Rp ${totalPemasukan.toLocaleString('id-ID')}</p>
+                            </div>
+                            <div>
+                                <p class="text-[8px] text-slate-500 uppercase font-bold mb-1">Total Pengeluaran</p>
+                                <p class="text-xs font-bold text-rose-400">Rp ${keluar.toLocaleString('id-ID')}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // DASHBOARD ANGGOTA
+                const agt = loggedMemberData;
+                const now = new Date();
+                const currentMonthIdx = now.getMonth();
+                const currentYear = now.getFullYear();
+                const selectedBln = document.getElementById('dash_bln_user')?.value || listBulan[currentMonthIdx];
+                const selectedThn = document.getElementById('dash_thn_user')?.value || currentYear;
+                const myKas = storageOrganisasi.kas_tim.filter(k => {
+                    const d = new Date(k.tanggal);
+                    return k.nama === agt.nama_lengkap && listBulan[d.getMonth()] === selectedBln && d.getFullYear() == selectedThn;
+                });
+                const myAbs = storageOrganisasi.absensi.filter(a => a.nama === agt.nama_lengkap && a.bulan === selectedBln && a.tahun == selectedThn);
+                let h=0, i=0, s=0, a=0; 
+                myAbs.forEach(abs => { 
+                    if(abs.kehadiran === "Hadir") h++; else if(abs.kehadiran === "Izin") i++; else if(abs.kehadiran === "Sakit") s++; else if(abs.kehadiran === "Alpa") a++; 
+                });
+                let totalBayar = 0; myKas.forEach(k => totalBayar += parseFloat(k.nominal || 0));
+
+                wadah.innerHTML = `
+                    <div class="bg-white p-5 rounded-3xl border shadow-sm flex flex-col items-center">
+                        <img src="${agt.foto || 'https://via.placeholder.com/150'}" class="w-20 h-20 rounded-full object-cover border-4 border-emerald-100 mb-3">
+                        <h2 class="text-sm font-bold text-slate-800 uppercase">${agt.nama_lengkap}</h2>
+                        <p class="text-[9px] text-slate-500 font-bold uppercase mb-4">Kelas: ${agt.kelas} | Angkatan: ${agt.angkatan || '-'}</p>
+                        <div class="w-full grid grid-cols-2 gap-2 mb-4">
+                            <select id="dash_bln_user" onchange="segarkanDashboardStatistik()" class="text-[10px] bg-slate-50 border border-slate-200 rounded-lg p-2 font-bold">${listBulan.map(b => `<option value="${b}" ${b===selectedBln ? 'selected' : ''}>${b}</option>`).join('')}</select>
+                            <select id="dash_thn_user" onchange="segarkanDashboardStatistik()" class="text-[10px] bg-slate-50 border border-slate-200 rounded-lg p-2 font-bold">${generateOpsiTahun(2023, 3000).replace(`value="${selectedThn}"`, `value="${selectedThn}" selected`)}</select>
+                        </div>
+                        <div class="w-full grid grid-cols-2 gap-2">
+                            <div class="bg-emerald-50 p-3 rounded-xl text-center"><p class="text-[8px] font-bold text-emerald-600 uppercase">Kas (${selectedBln})</p><p class="text-xs font-black text-slate-800">Rp ${totalBayar.toLocaleString('id-ID')}</p></div>
+                            <div class="bg-blue-50 p-3 rounded-xl text-center"><p class="text-[8px] font-bold text-blue-600 uppercase">Hadir (${selectedBln})</p><p class="text-xs font-black text-slate-800">${h} Kali</p></div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl border border-slate-100">
+                        <h3 class="text-[9px] font-bold text-slate-400 uppercase mb-3">Rincian Kehadiran - ${selectedBln} ${selectedThn}</h3>
+                        <div class="grid grid-cols-4 gap-1 text-center">
+                            <div class="p-2 rounded bg-emerald-100"><p class="text-[7px] font-bold">H</p><p class="text-xs font-bold">${h}</p></div>
+                            <div class="p-2 rounded bg-blue-100"><p class="text-[7px] font-bold">I</p><p class="text-xs font-bold">${i}</p></div>
+                            <div class="p-2 rounded bg-amber-100"><p class="text-[7px] font-bold">S</p><p class="text-xs font-bold">${s}</p></div>
+                            <div class="p-2 rounded bg-rose-100"><p class="text-[7px] font-bold">A</p><p class="text-xs font-bold">${a}</p></div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function eksporDataCSV() {
+            let data = storageOrganisasi[kategoriArsipAktif];
+            if(!data || data.length === 0) return;
+            let csv = Object.keys(data[0]).filter(k => k !== 'foto' && k !== 'file').join(",") + "\n" + data.map(i => Object.entries(i).filter(([k]) => k !== 'foto' && k !== 'file').map(([_, v]) => `"${v}"`).join(",")).join("\n");
+            let link = document.createElement("a"); link.href = encodeURI("data:text/csv;charset=utf-8," + csv); link.download = `Data_${kategoriArsipAktif}.csv`; link.click();
+        }
+
+        function eksporDataPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('l', 'mm', 'a4');
+            doc.text(kategoriArsipAktif.toUpperCase(), 14, 15);
+            doc.autoTable({ html: 'table', startY: 25, theme: 'striped', headStyles: { fillColor: [16, 185, 129] } });
+            doc.save(`Laporan_${kategoriArsipAktif}.pdf`);
+        }
+
+        function jalankanFiturCari() {
+            currentPage = 1;
+            renderListArsip();
+        }
+
+        function aksiHapusData(kat, id) { if(confirm("Hapus permanen?")) database.ref('administrasi_digital/' + kat + '/' + id).remove(); }
+
+        function renderAkumulasiKas() {
+            const wadahAkumulasi = document.getElementById('container-akumulasi-data');
+            const dataKas = storageOrganisasi.kas_tim;
+            let dataAnggota = storageOrganisasi.anggota;
+            if(dataAnggota.length === 0) return;
+            document.getElementById('akumulasi-khusus-container').classList.remove('hidden');
+            
+            const start = (currentPage - 1) * rowsPerPage;
+            const paginatedAnggota = dataAnggota.slice(start, start + rowsPerPage);
+            
+            const listPeriode = []; for (let m = 0; m < 12; m++) listPeriode.push({ bln: m, thn: 2026 });
+            const pMap = {}; dataKas.forEach(k => { const d = new Date(k.tanggal); pMap[`${k.nama}_${d.getFullYear()}_${d.getMonth()}`] = true; });
+            
+            let html = `<table><thead><tr><th>No</th><th>Nama Anggota</th>`;
+            listPeriode.forEach(p => html += `<th>${new Date(p.thn, p.bln).toLocaleString('id-ID', { month: 'short' })}</th>`);
+            html += `<th>Total</th></tr></thead><tbody>`;
+            
+            paginatedAnggota.forEach((agt, idx) => {
+                let lunas = 0; html += `<tr><td>${start + idx + 1}</td><td class="font-bold">${agt.nama_lengkap}</td>`;
+                listPeriode.forEach(p => { 
+                    const ok = pMap[`${agt.nama_lengkap}_${p.thn}_${p.bln}`]; 
+                    html += `<td class="text-center"><span class="${ok ? 'text-emerald-500' : 'text-rose-500'}">●</span></td>`; 
+                    if(ok) lunas++; 
+                });
+                html += `<td class="text-emerald-600 font-bold">${lunas}</td></tr>`;
+            });
+            html += `</tbody></table>`; wadahAkumulasi.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
